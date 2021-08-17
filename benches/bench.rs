@@ -12,12 +12,22 @@ fn fast_prime_gen() {
     black_box(seeded_gen_prime(256));
 }
 
+fn rsa_keyset_gen(size: usize) {
+    black_box(seeded_gen_rsa_keysets(size));
+}
+
 fn benchmark(c: &mut Criterion) {
     c.bench_function("encrypt_decrypt", |b| {
         b.iter(|| encrypt_decrypt())
     });
     c.bench_function("fast_prime_gen", |b| {
         b.iter(|| fast_prime_gen())
+    });
+    c.bench_function("rsa_keyset_gen 512-bits", |b| {
+        b.iter(|| rsa_keyset_gen(512))
+    });
+    c.bench_function("rsa_keyset_gen 1024-bits", |b| {
+        b.iter(|| rsa_keyset_gen(1024))
     });
 }
 
