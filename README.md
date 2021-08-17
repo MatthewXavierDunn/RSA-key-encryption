@@ -8,10 +8,10 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-RSA-key-encryption = "0.1"
+rsa = "0.1"
 ```
 
-The following is an example of how to use the library:
+Example usage:
 
 ```rust
 // generates rsa key sets with 256-bit key security
