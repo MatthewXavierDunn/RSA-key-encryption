@@ -1,6 +1,4 @@
-// A simple RSA library
-// Key generation uses an implementation of the following paper by Ueli M.Maurer
-// https://link.springer.com/content/pdf/10.1007/BF00202269.pdf
+//! A very simple RSA cryptography library. Key generation uses an implementation of the algorithm detailed in the paper: *["Fast Generation of Prime Numbers and  Secure Public-Key Cryptographic Parameters"](https://link.springer.com/content/pdf/10.1007/BF00202269.pdf)* by *Ueli M.Maurer*
 
 extern crate num_bigint;
 extern crate rand;
@@ -11,6 +9,7 @@ use rand::{
     Rng,
 };
 
+/// Returns greatest common divisor of two unsigned integers
 pub fn gcd(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
     let mut u = u.into();
     let mut v = v.into();
@@ -38,13 +37,16 @@ pub fn gcd(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
     return u << shift;
 }
 
+/// Returns lowest common multiple of two unsinged integers
 pub fn lcm(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
     let mut u = u.into();
     let mut v = v.into();
     return (&u * &v) / gcd(u, v);
 }
 
-// Fast for n <= 8388608
+/// Returns [`true`] if given unsigned integer is prime, [`false`] otherwise
+///
+/// Fast for `n <= 8388608`
 pub fn is_prime(n: impl Into<BigUint>) -> bool {
     let n = n.into();
     if n <= 3u8.into() {
@@ -63,31 +65,64 @@ pub fn is_prime(n: impl Into<BigUint>) -> bool {
     }
 }
 
-// Reasonable for n <= 8388608
-// Could be faster...
+/// Returns greatest prime factor of an unsigned integer
+///
+/// Reasonable for `n <= 8388608`
+///
+/// Could be faster...
 pub fn greatest_prime_factor(n: impl Into<BigUint>) -> BigUint {
     let n = n.into();
     if is_prime(n.clone()) {
         return n;
-    };
-
-    let mut i = &n / 2u8;
-    while i > 2u8.into() {
-        if &n % &i == 0u8.into() {
-            if is_prime(i.clone()) {
-                return i;
-            }
-        }
-        i -= 1u8;
     }
-    return i;
+    let mut i: BigUint = 2u8.into();
+    while i < n {
+        if &n % &i == 0u8.into() {
+            return greatest_prime_factor(n / i);
+        }
+        i += 1u8;
+    }
+    return n;
 }
 
-// Returns Vec of primes <= a
-// Reasonable for n <= 100
+const fn prec_is_prime(n: usize) -> bool {
+    if n <= 3 {
+        n > 1
+    } else if n % 2 == 0 || n % 3 == 0 {
+        false
+    } else {
+        let mut i = 5;
+        while i * i <= n {
+            if n % i == 0 || n % (i + 2) == 0 {
+                return false;
+            }
+            i += 6;
+        }
+        true
+    }
+}
+
+const A: usize = 24221; // Largest possible size
+const fn prec_primes() -> [bool; A] {
+    let mut primes = [false; A];
+    let mut n = 1;
+    while n < A {
+        primes[n] = prec_is_prime(n);
+        n += 1;
+    }
+    return primes;
+}
+
+const PRIMES: [bool; A] = prec_primes();
+
+/// Returns [`Vec`] of `primes <= a`
+///
+/// Reasonable for `n <= 100`
 pub fn primes_upto(a: impl Into<BigUint>) -> Vec<BigUint> {
     let a = a.into();
-    assert!(a > 0u8.into());
+    if a < A.into() {
+        return PRIMES[..*a.to_u64_digits().get(0).unwrap() as usize + 1].iter().enumerate().filter_map(|(n, x)| if *x { Some(BigUint::from(n)) } else { None }).collect()
+    }
     let mut primes = Vec::new();
     let mut i: BigUint = 1u8.into();
     while &i <= &a {
@@ -99,7 +134,7 @@ pub fn primes_upto(a: impl Into<BigUint>) -> Vec<BigUint> {
     return primes;
 }
 
-// Checks if a has prime factors <= b
+/// Checks if `a` has prime factors `<= b`
 pub fn trial_div(a: impl Into<BigUint>, b: impl Into<BigUint>) -> bool {
     let a = a.into();
     let b = b.into();
@@ -112,17 +147,18 @@ pub fn trial_div(a: impl Into<BigUint>, b: impl Into<BigUint>) -> bool {
     return true;
 }
 
-// Uses Fermat's Little Theorem to check primality
-// TODO: Extend to Miller-Rabin Primality Test
+/// Uses Fermat's Little Theorem to check primality
+///
+/// TODO: Extend to Miller-Rabin Primality Test
 pub fn check_primality(n: impl Into<BigUint>, a: impl Into<BigUint>) -> bool {
     let n = n.into();
     let a = a.into();
     return a.modpow(&(&n - 1u8), &n) == 1u8.into();
 }
 
-// Selects relative size from interval [0.5, 1] according to probability
-// distribution of relative size x of the largest prime factor of a large random
-// integer give that it is at least 0.5
+/// Selects relative size from interval `[0.5, 1]` according to probability
+/// distribution of relative size `x` of the largest prime factor of a large random
+/// integer give that it is at least `0.5`
 pub fn gen_rel_size() -> f64 {
     let mut rng = rand::thread_rng();
     let n = rng.gen_range::<u128, _>(10000..100000);
@@ -130,7 +166,7 @@ pub fn gen_rel_size() -> f64 {
     return gpf.log(2.0) / (n as f64).log(2.0);
 }
 
-// Generates a random prime k bits in length
+/// Generates a random prime `k bits` in length
 pub fn gen_prime(k: usize) -> BigUint {
     const C_OPT: f64 = 0.1;
     let margin = 20;
@@ -173,8 +209,9 @@ pub fn gen_prime(k: usize) -> BigUint {
     }
 }
 
-// Generates a secure public & private key set for RSA encryption
-// Returns a tuple of public & private key set
+/// Generates a secure public & private key set for RSA encryption
+///
+/// Returns a tuple of public & private key set
 pub fn gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
     let p = gen_prime(length / 2);
     let q = gen_prime(length / 2);
@@ -192,8 +229,9 @@ pub fn gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
     return ((public_key, modulus), private_key);
 }
 
-// Encrypts a message using the public key set
-// TODO: Implement padding sceheme
+/// Encrypts a message using the public key set
+///
+/// TODO: Implement padding sceheme
 pub fn rsa_encrypt(
     msg: impl Into<BigUint>,
     public_key: impl Into<BigUint>,
@@ -205,8 +243,9 @@ pub fn rsa_encrypt(
     return msg.modpow(&public_key, &modulus);
 }
 
-// Decrypts a message using the private key set
-// TODo: Implement padding scheme
+/// Decrypts a message using the private key set
+///
+/// TODO: Implement padding scheme
 pub fn rsa_decrypt(
     cipher_text: impl Into<BigUint>,
     private_key: impl Into<BigUint>,
