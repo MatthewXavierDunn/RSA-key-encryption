@@ -1,13 +1,50 @@
-//! A very simple RSA cryptography library. Key generation uses an implementation of the algorithm detailed in the paper: *["Fast Generation of Prime Numbers and  Secure Public-Key Cryptographic Parameters"](https://link.springer.com/content/pdf/10.1007/BF00202269.pdf)* by *Ueli M.Maurer*
-
-extern crate num_bigint;
-extern crate rand;
+//! A very simple RSA cryptography library. Key generation uses an
+//! implementation of the algorithm detailed in the paper:
+//! *["Fast Generation of Prime Numbers and  Secure Public-Key Cryptographic Parameters"](https://link.springer.com/content/pdf/10.1007/BF00202269.pdf)* by *Ueli M.Maurer*
 
 use num_bigint::{BigUint, RandomBits};
 use rand::{
     distributions::{Distribution, Uniform},
+    prelude::*,
     Rng,
 };
+use rand_pcg::Pcg64;
+
+// Largest possible 2634
+const A: usize = 2634;
+const PRIMES: [u128; A] = precalc_primes();
+
+/// Constant version of [`is_prime`]
+const fn const_is_prime(n: u128) -> bool {
+    if n <= 3 {
+        n > 1
+    } else if n % 2 == 0 || n % 3 == 0 {
+        false
+    } else {
+        let mut i = 5;
+        while i * i <= n {
+            if n % i == 0 || n % (i + 2) == 0 {
+                return false;
+            }
+            i += 6;
+        }
+        true
+    }
+}
+
+const fn precalc_primes() -> [u128; A] {
+    let mut primes = [0; A];
+    let mut n = 1;
+    let mut i = 0;
+    while i < A {
+        if const_is_prime(n) {
+            primes[i] = n;
+            i += 1;
+        }
+        n += 1;
+    }
+    return primes;
+}
 
 /// Returns greatest common divisor of two unsigned integers
 pub fn gcd(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
@@ -39,8 +76,8 @@ pub fn gcd(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
 
 /// Returns lowest common multiple of two unsinged integers
 pub fn lcm(u: impl Into<BigUint>, v: impl Into<BigUint>) -> BigUint {
-    let mut u = u.into();
-    let mut v = v.into();
+    let u = u.into();
+    let v = v.into();
     return (&u * &v) / gcd(u, v);
 }
 
@@ -85,43 +122,23 @@ pub fn greatest_prime_factor(n: impl Into<BigUint>) -> BigUint {
     return n;
 }
 
-const fn prec_is_prime(n: usize) -> bool {
-    if n <= 3 {
-        n > 1
-    } else if n % 2 == 0 || n % 3 == 0 {
-        false
-    } else {
-        let mut i = 5;
-        while i * i <= n {
-            if n % i == 0 || n % (i + 2) == 0 {
-                return false;
-            }
-            i += 6;
-        }
-        true
-    }
-}
-
-const A: usize = 24221; // Largest possible size
-const fn prec_primes() -> [bool; A] {
-    let mut primes = [false; A];
-    let mut n = 1;
-    while n < A {
-        primes[n] = prec_is_prime(n);
-        n += 1;
-    }
-    return primes;
-}
-
-const PRIMES: [bool; A] = prec_primes();
-
 /// Returns [`Vec`] of `primes <= a`
 ///
 /// Reasonable for `n <= 100`
 pub fn primes_upto(a: impl Into<BigUint>) -> Vec<BigUint> {
     let a = a.into();
-    if a < A.into() {
-        return PRIMES[..*a.to_u64_digits().get(0).unwrap() as usize + 1].iter().enumerate().filter_map(|(n, x)| if *x { Some(BigUint::from(n)) } else { None }).collect()
+    if a <= PRIMES[A - 1].into() {
+        let i = match PRIMES
+            .to_vec()
+            .binary_search(&(*a.to_u64_digits().get(0).unwrap() as u128))
+        {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        return PRIMES[..=i]
+            .iter()
+            .map(|&x| BigUint::from(x))
+            .collect::<Vec<BigUint>>();
     }
     let mut primes = Vec::new();
     let mut i: BigUint = 1u8.into();
@@ -166,27 +183,35 @@ pub fn gen_rel_size() -> f64 {
     return gpf.log(2.0) / (n as f64).log(2.0);
 }
 
+/// FOR BENCHMARKING ONLY
+///
+/// VERY INSECURE
+fn seeded_gen_rel_size() -> f64 {
+    let mut rng = Pcg64::seed_from_u64(2);
+    let n = rng.gen_range::<u128, _>(10000..100000);
+    let gpf = *greatest_prime_factor(n).to_u64_digits().get(0).unwrap() as f64;
+    return gpf.log(2.0) / (n as f64).log(2.0);
+}
+
 /// Generates a random prime `k bits` in length
 pub fn gen_prime(k: usize) -> BigUint {
     const C_OPT: f64 = 0.1;
-    let margin = 20;
-    let mut rel_size;
-    let mut n: BigUint = 1u8.into();
+    const MARGIN: f64 = 20.0;
     let mut rng = rand::thread_rng();
 
     if k <= 23 {
-        loop {
-            n = rng.sample(RandomBits::new(k as u64));
+        return loop {
+            let n: BigUint = rng.sample(RandomBits::new(k as u64));
             if n == 1u8.into() || is_prime(n.clone()) {
-                break;
+                break n;
             }
-        }
-        return n;
+        };
     } else {
         let g = C_OPT * k as f64 * k as f64;
+        let mut rel_size;
         loop {
             rel_size = gen_rel_size();
-            if k as f64 * rel_size < (k as f64 - margin as f64).max(0.0) {
+            if k as f64 * rel_size < (k as f64 - MARGIN).max(0.0) {
                 break;
             }
         }
@@ -195,17 +220,56 @@ pub fn gen_prime(k: usize) -> BigUint {
         let i = BigUint::from(2u8).pow((k - 1) as u32) / &q;
         let range = Uniform::from(i.clone()..=2u8 * &i);
 
-        loop {
-            n = 2u8 * range.sample(&mut rng) * &q + 1u8;
+        return loop {
+            let n = 2u8 * range.sample(&mut rng) * &q + 1u8;
             let a = rng.gen_range::<u32, _>(2..=&n.to_u32_digits()[0] - 1);
             if trial_div(n.clone(), g as u128) {
                 if check_primality(n.clone(), a) {
-                    break;
+                    break n;
                 }
+            }
+        };
+    }
+}
+
+/// FOR BENCHMARKING ONLY
+///
+/// VERY INSECURE
+pub fn seeded_gen_prime(k: usize) -> BigUint {
+    const C_OPT: f64 = 0.1;
+    const MARGIN: f64 = 20.0;
+    let mut rng = Pcg64::seed_from_u64(2);
+
+    if k <= 23 {
+        return loop {
+            let n: BigUint = rng.sample(RandomBits::new(k as u64));
+            if n == 1u8.into() || is_prime(n.clone()) {
+                break n;
+            }
+        };
+    } else {
+        let g = C_OPT * k as f64 * k as f64;
+        let mut rel_size;
+        loop {
+            rel_size = seeded_gen_rel_size();
+            if k as f64 * rel_size < (k as f64 - MARGIN).max(0.0) {
+                break;
             }
         }
 
-        return n;
+        let q = gen_prime((rel_size * k as f64) as usize);
+        let i = BigUint::from(2u8).pow((k - 1) as u32) / &q;
+        let range = Uniform::from(i.clone()..=2u8 * &i);
+
+        return loop {
+            let n = 2u8 * range.sample(&mut rng) * &q + 1u8;
+            let a = rng.gen_range::<u32, _>(2..=&n.to_u32_digits()[0] - 1);
+            if trial_div(n.clone(), g as u128) {
+                if check_primality(n.clone(), a) {
+                    break n;
+                }
+            }
+        };
     }
 }
 
@@ -221,11 +285,37 @@ pub fn gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
     let public_key = 65537;
 
     let mut x: u64 = 1;
-    while (1u8 + x * &totient) % &public_key != 0u8.into() {
+    let private_key = loop {
+        let n = 1u8 + x * &totient;
+        if &n % &public_key == 0u8.into() {
+            break n;
+        }
         x += 1;
-    }
+    } / &public_key;
 
-    let private_key = (1u8 + x * &totient) / &public_key;
+    return ((public_key, modulus), private_key);
+}
+
+/// FOR BENCHMARKING ONLY
+///
+/// VERY INSECURE
+pub fn seeded_gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
+    let p = seeded_gen_prime(length / 2);
+    let q = seeded_gen_prime(length / 2);
+
+    let modulus = &p * &q;
+    let totient = lcm(&p - 1u8, &q - 1u8);
+    let public_key = 65537;
+
+    let mut x: u64 = 1;
+    let private_key = loop {
+        let n = 1u8 + x * &totient;
+        if &n % &public_key != 0u8.into() {
+            break n;
+        }
+        x += 1;
+    } / &public_key;
+
     return ((public_key, modulus), private_key);
 }
 
