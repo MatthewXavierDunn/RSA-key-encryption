@@ -15,16 +15,16 @@ Example usage:
 
 ```rust
 // generates rsa key sets with 256-bit key security
-let ((public_key, modulus), private_key) = gen_rsa_keysets(256);
+let (public_key, private_key) = gen_rsa_keysets(256);
 
 // the type of your secret must be explicit and one of u8, u16, u32, u64, and u128
 let secret = 12345u128;
 
 // to encrypt your secret
-let secure_secret = rsa_encrypt(secret, public_key, modulus);
+let secure_secret = rsa_encrypt(secret, public_key);
 
 // to unencrypt your secret
-let recovered_secret = rsa_decrypt(secure_secret, private_key, modulus);
+let recovered_secret = rsa_decrypt(secure_secret, private_key);
 
 assert_eq!(secret, recovered_secret);
 ```
