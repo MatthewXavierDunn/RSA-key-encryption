@@ -1,4 +1,4 @@
-//! A very simple RSA cryptography library. Key generation uses an
+//! A simple RSA cryptography library. Key generation uses an
 //! implementation of the algorithm detailed in the paper:
 //! *["Fast Generation of Prime Numbers and  Secure Public-Key Cryptographic Parameters"](https://link.springer.com/content/pdf/10.1007/BF00202269.pdf)* by *Ueli M.Maurer*
 
