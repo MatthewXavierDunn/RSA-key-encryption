@@ -26,12 +26,6 @@ fn benchmark(c: &mut Criterion) {
             b.iter(|| rsa_keyset_gen(size));
         });
     }
-    /* group.bench_function("rsa_keyset_gen 1024-bits", |b| {
-        b.iter(|| rsa_keyset_gen(black_box(1024)));
-    });
-    group.bench_function("rsa_keyset_gen 2048-bits", |b| {
-        b.iter(|| rsa_keyset_gen(black_box(2048)));
-    }); */
     group.finish();
 }
 
