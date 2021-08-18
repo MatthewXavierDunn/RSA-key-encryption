@@ -277,16 +277,48 @@ pub fn seeded_gen_prime(k: usize) -> BigUint {
     }
 }
 
+/// Store RSA public key and modulus
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+    value: BigUint,
+    modulus: BigUint,
+}
+
+impl PublicKey {
+    pub fn new(value: impl Into<BigUint>, modulus: impl Into<BigUint>) -> Self {
+        Self {
+            value: value.into(),
+            modulus: modulus.into(),
+        }
+    }
+}
+
+/// Stores RSA private key and modulus
+#[derive(Debug, Clone)]
+pub struct PrivateKey {
+    value: BigUint,
+    modulus: BigUint,
+}
+
+impl PrivateKey {
+    pub fn new(value: impl Into<BigUint>, modulus: impl Into<BigUint>) -> Self {
+        Self {
+            value: value.into(),
+            modulus: modulus.into(),
+        }
+    }
+}
+
 /// Generates a secure public & private key set for RSA encryption
 ///
 /// Returns a tuple of public & private key set
-pub fn gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
+pub fn gen_rsa_keysets(length: usize) -> (PublicKey, PrivateKey) {
     let p = gen_prime(length / 2);
     let q = gen_prime(length / 2);
 
     let modulus = &p * &q;
     let totient = lcm(&p - 1u8, &q - 1u8);
-    let public_key = 65537;
+    let public_key = 65537u128;
 
     let mut x: u64 = 1;
     let private_key = loop {
@@ -297,19 +329,22 @@ pub fn gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
         x += 1;
     } / &public_key;
 
-    return ((public_key, modulus), private_key);
+    return (
+        PublicKey::new(public_key, modulus.clone()),
+        PrivateKey::new(private_key, modulus),
+    );
 }
 
 /// FOR BENCHMARKING ONLY
 ///
 /// VERY INSECURE
-pub fn seeded_gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
+pub fn seeded_gen_rsa_keysets(length: usize) -> (PublicKey, PrivateKey) {
     let p = seeded_gen_prime(length / 2);
     let q = seeded_gen_prime(length / 2);
 
     let modulus = &p * &q;
     let totient = lcm(&p - 1u8, &q - 1u8);
-    let public_key = 65537;
+    let public_key = 65537u128;
 
     let mut x: u64 = 1;
     let private_key = loop {
@@ -320,35 +355,26 @@ pub fn seeded_gen_rsa_keysets(length: usize) -> ((u64, BigUint), BigUint) {
         x += 1;
     } / &public_key;
 
-    return ((public_key, modulus), private_key);
+    return (
+        PublicKey::new(public_key, modulus.clone()),
+        PrivateKey::new(private_key, modulus),
+    );
 }
 
 /// Encrypts a message using the public key set
 ///
 /// TODO: Implement padding sceheme
-pub fn rsa_encrypt(
-    msg: impl Into<BigUint>,
-    public_key: impl Into<BigUint>,
-    modulus: impl Into<BigUint>,
-) -> BigUint {
+pub fn rsa_encrypt(msg: impl Into<BigUint>, public_key: PublicKey) -> BigUint {
     let msg = msg.into();
-    let public_key = public_key.into();
-    let modulus = modulus.into();
-    return msg.modpow(&public_key, &modulus);
+    return msg.modpow(&public_key.value, &public_key.modulus);
 }
 
 /// Decrypts a message using the private key set
 ///
 /// TODO: Implement padding scheme
-pub fn rsa_decrypt(
-    cipher_text: impl Into<BigUint>,
-    private_key: impl Into<BigUint>,
-    modulus: impl Into<BigUint>,
-) -> BigUint {
+pub fn rsa_decrypt(cipher_text: impl Into<BigUint>, private_key: PrivateKey) -> BigUint {
     let cipher_text = cipher_text.into();
-    let private_key = private_key.into();
-    let modulus = modulus.into();
-    return cipher_text.modpow(&private_key, &modulus);
+    return cipher_text.modpow(&private_key.value, &private_key.modulus);
 }
 
 #[cfg(test)]
@@ -407,18 +433,17 @@ mod tests {
 
     #[test]
     fn gen_rsa_keysets_works() {
-        let ((public_key, _modulus), private_key) = gen_rsa_keysets(256);
-        assert_eq!(public_key, 65537);
-        dbg!(&private_key);
-        assert!(private_key.bits() - 1 <= 256);
+        let (public_key, private_key) = gen_rsa_keysets(256);
+        assert_eq!(public_key.value, 65537u128.into());
+        assert!(private_key.value.bits() - 1 <= 256);
     }
 
     #[test]
     fn rsa_encrypt_decrypt_works() {
-        let ((public_key, modulus), private_key) = gen_rsa_keysets(256);
+        let (public_key, private_key) = gen_rsa_keysets(256);
         let msg = BigUint::from_bytes_be(b"Hello World");
-        let cipher_text = rsa_encrypt(msg.clone(), public_key.clone(), modulus.clone());
-        let plain_text = rsa_decrypt(cipher_text.clone(), private_key.clone(), modulus.clone());
+        let cipher_text = rsa_encrypt(msg.clone(), public_key);
+        let plain_text = rsa_decrypt(cipher_text.clone(), private_key);
 
         assert!(&cipher_text != &plain_text);
         assert!(&plain_text == &msg);
