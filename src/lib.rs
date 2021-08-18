@@ -140,9 +140,12 @@ pub fn primes_upto(a: impl Into<BigUint>) -> Vec<BigUint> {
             .map(|&x| BigUint::from(x))
             .collect::<Vec<BigUint>>();
     }
-    let mut primes = Vec::new();
-    let mut i: BigUint = 1u8.into();
-    while &i <= &a {
+    let mut primes = PRIMES
+        .iter()
+        .map(|&x| BigUint::from(x))
+        .collect::<Vec<BigUint>>();
+    let mut i: BigUint = PRIMES[A - 1].into();
+    while i <= a {
         if is_prime(i.clone()) {
             primes.push(i.clone());
         }
@@ -152,10 +155,9 @@ pub fn primes_upto(a: impl Into<BigUint>) -> Vec<BigUint> {
 }
 
 /// Checks if `a` has prime factors `<= b`
-pub fn trial_div(a: impl Into<BigUint>, b: impl Into<BigUint>) -> bool {
+pub fn trial_div(a: impl Into<BigUint>, primes: Vec<BigUint>) -> bool {
     let a = a.into();
-    let b = b.into();
-    let primes = primes_upto(b);
+    //dbg!(&primes);
     for p in primes.iter() {
         if &a % p == 0u8.into() {
             return false;
@@ -208,6 +210,7 @@ pub fn gen_prime(k: usize) -> BigUint {
         };
     } else {
         let g = C_OPT * k as f64 * k as f64;
+        let primes_upto_g = primes_upto(g as u128);
         let mut rel_size;
         loop {
             rel_size = gen_rel_size();
@@ -223,7 +226,7 @@ pub fn gen_prime(k: usize) -> BigUint {
         return loop {
             let n = 2u8 * range.sample(&mut rng) * &q + 1u8;
             let a = rng.gen_range::<u32, _>(2..=&n.to_u32_digits()[0] - 1);
-            if trial_div(n.clone(), g as u128) {
+            if trial_div(n.clone(), primes_upto_g.clone()) {
                 if check_primality(n.clone(), a) {
                     break n;
                 }
@@ -249,6 +252,7 @@ pub fn seeded_gen_prime(k: usize) -> BigUint {
         };
     } else {
         let g = C_OPT * k as f64 * k as f64;
+        let primes_upto_g = primes_upto(g as u128);
         let mut rel_size;
         loop {
             rel_size = seeded_gen_rel_size();
@@ -264,7 +268,7 @@ pub fn seeded_gen_prime(k: usize) -> BigUint {
         return loop {
             let n = 2u8 * range.sample(&mut rng) * &q + 1u8;
             let a = rng.gen_range::<u32, _>(2..=&n.to_u32_digits()[0] - 1);
-            if trial_div(n.clone(), g as u128) {
+            if trial_div(n.clone(), primes_upto_g.clone()) {
                 if check_primality(n.clone(), a) {
                     break n;
                 }
@@ -405,7 +409,8 @@ mod tests {
     fn gen_rsa_keysets_works() {
         let ((public_key, _modulus), private_key) = gen_rsa_keysets(256);
         assert_eq!(public_key, 65537);
-        assert!(private_key.bits() <= 256);
+        dbg!(&private_key);
+        assert!(private_key.bits() - 1 <= 256);
     }
 
     #[test]
