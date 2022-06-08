@@ -4,8 +4,8 @@ use rsa::{rsa_decrypt, rsa_encrypt, seeded_gen_prime, seeded_gen_rsa_keysets};
 fn encrypt_decrypt() {
     let (public_key, private_key) = seeded_gen_rsa_keysets(black_box(256));
     let msg = 12345u128;
-    let ct = rsa_encrypt(msg, public_key);
-    black_box(rsa_decrypt(ct, private_key));
+    let ct = rsa_encrypt(msg, &public_key);
+    black_box(rsa_decrypt(ct, &private_key));
 }
 
 fn fast_prime_gen() {
