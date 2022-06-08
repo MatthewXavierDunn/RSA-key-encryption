@@ -2,7 +2,7 @@
 
 A simple RSA cryptography library. Key generation uses an implementation of the algorithm detailed in the paper: *["Fast Generation of Prime Numbers and  Secure Public-Key Cryptographic Parameters"](https://link.springer.com/content/pdf/10.1007/BF00202269.pdf)* by *Ueli M.Maurer*
 
-## Getting Started
+## Getting Started **(Not on `crates.io` yet)**
 
 Donwload and Install [`rustup`](https://rustup.rs/).
 
@@ -36,10 +36,10 @@ let (public_key, private_key) = gen_rsa_keysets(256);
 let secret = 12345u128;
 
 // to encrypt your secret
-let secure_secret = rsa_encrypt(secret, public_key);
+let secure_secret = rsa_encrypt(secret, &public_key);
 
 // to unencrypt your secret
-let recovered_secret = rsa_decrypt(secure_secret, private_key);
+let recovered_secret = rsa_decrypt(secure_secret, &private_key);
 
 // the unencrypted value should be identical to the original
 assert_eq!(secret, recovered_secret);
