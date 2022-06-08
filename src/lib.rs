@@ -14,14 +14,12 @@ use rand::{
 use rand_pcg::Pcg64;
 use std::sync::Mutex;
 
-const A: usize = 2634;
-
 lazy_static! {
     static ref PRIMES: Mutex<Vec<BigUint>> = {
         let mut primes = Vec::new();
         let mut n = BigUint::from(1u8);
         let mut i = 0;
-        while i < A {
+        while i < 2634 {
             if is_prime(&n) {
                 primes.push(n.clone());
                 i += 1;
